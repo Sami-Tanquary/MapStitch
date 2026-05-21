@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MapStitch — Print Any City</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #00ff88;
+    --accent2: #0088ff;
+    --danger: #ff4455;
+    --text: #f0f0f8;
+    --muted: #666680;
+    --tile-size: 256;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 72px 40px 100px;
+  }
+
+  /* ── Header ── */
+  header {
+    margin-bottom: 72px;
+  }
+
+  .logo {
+    font-size: 0.75rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s ease infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  h1 {
+    font-size: clamp(3.5rem, 10vw, 6rem);
+    font-weight: 800;
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+  }
+
+  h1 span {
+    display: block;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 480px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 36px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: attr(data-step);
+    position: absolute;
+    top: 20px; right: 24px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--border);
+    letter-spacing: 0.1em;
+  }
+
+  .card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* ── Search ── */
+  .search-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  #cityInput {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  #cityInput:focus { border-color: var(--accent); }
+  #cityInput::placeholder { color: var(--muted); }
+
+  #searchBtn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  #searchBtn:hover { background: #00dd77; transform: translateY(-1px); }
+  #searchBtn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+
+  .search-results {
+    display: none;
+    margin-top: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .result-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .result-item:last-child { border-bottom: none; }
+  .result-item:hover { background: var(--border); }
+  .result-item .name { font-weight: 700; }
+  .result-item .coords { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+
+  /* Selected city display */
+  .city-selected {
+    display: none;
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: rgba(0,255,136,0.06);
+    border: 1px solid rgba(0,255,136,0.2);
+    border-radius: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .city-selected { display: none; }
+
+  /* ── Zoom selector ── */
+  .zoom-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+
+  .zoom-opt {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .zoom-opt:hover { border-color: var(--accent); }
+
+  .zoom-opt.active {
+    border-color: var(--accent);
+    background: rgba(0,255,136,0.08);
+  }
+
+  .zoom-opt .znum {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .zoom-opt.active .znum { color: var(--accent); }
+
+  .zoom-opt .zdesc {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+    margin-top: 4px;
+    line-height: 1.3;
+  }
+
+  .zoom-opt .ztag {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    margin-top: 5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--border);
+    color: var(--muted);
+  }
+
+  .zoom-opt.active .ztag { background: rgba(0,255,136,0.15); color: var(--accent); }
+  .zoom-opt .ztag.fast { background: rgba(0,255,136,0.12); color: var(--accent); }
+  .zoom-opt .ztag.slow { background: rgba(255,68,85,0.12); color: var(--danger); }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .stat-box .val {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .stat-box .lbl {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── Warning ── */
+  .warn {
+    background: rgba(255,166,0,0.07);
+    border: 1px solid rgba(255,166,0,0.3);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: #ffa600;
+    margin-bottom: 16px;
+    display: none;
+    line-height: 1.6;
+  }
+
+  /* ── Build button ── */
+  #buildBtn {
+    width: 100%;
+    padding: 22px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 14px;
+    font-family: 'Syne', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 800;
+    cursor: pointer;
+    letter-spacing: -0.01em;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #buildBtn:hover:not(:disabled) { background: #00dd77; transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,255,136,0.2); }
+  #buildBtn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; box-shadow: none; }
+
+  #downloadBtn {
+    width: 100%;
+    padding: 22px;
+    background: transparent;
+    color: var(--accent);
+    border: 2px solid var(--accent);
+    border-radius: 14px;
+    font-family: 'Syne', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 800;
+    cursor: pointer;
+    margin-top: 14px;
+    display: none;
+    transition: all 0.15s;
+  }
+
+  #downloadBtn:hover { background: rgba(0,255,136,0.08); transform: translateY(-2px); }
+
+  /* ── Progress ── */
+  .progress-wrap { display: none; margin-top: 20px; }
+
+  .progress-track {
+    background: var(--surface2);
+    border-radius: 99px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+
+  .progress-fill {
+    height: 6px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 99px;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .status {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* ── Preview ── */
+  #previewWrap {
+    display: none;
+    margin-top: 20px;
+  }
+
+  #previewWrap img {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .fedex-tip {
+    margin-top: 14px;
+    padding: 16px;
+    background: rgba(0,136,255,0.07);
+    border: 1px solid rgba(0,136,255,0.2);
+    border-radius: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent2);
+    line-height: 1.7;
+  }
+
+  /* ── Footer ── */
+  footer {
+    margin-top: 60px;
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 2;
+  }
+
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ── Error ── */
+  .error-msg {
+    display: none;
+    margin-top: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--danger);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">MapStitch</div>
+    <h1>Print<span>Any City.</span></h1>
+    <p class="subtitle">
+      Search any city → stitch OpenStreetMap tiles → download a print-ready PNG.<br>
+      No account. No API key. Works in your browser.
+    </p>
+  </header>
+
+  <!-- Step 1: Search -->
+  <div class="card" data-step="01 / CITY">
+    <div class="card-label">Search City</div>
+    <div class="search-row">
+      <input type="text" id="cityInput" placeholder="e.g. Flagstaff AZ, Tokyo, Berlin..." autocomplete="off">
+      <button id="searchBtn">Look up →</button>
+    </div>
+    <div class="error-msg" id="searchError">No results found. Try a different search.</div>
+    <div class="search-results" id="searchResults"></div>
+    <div class="city-selected" id="citySelected"></div>
+  </div>
+
+  <!-- Step 2: Zoom -->
+  <div class="card" data-step="02 / DETAIL">
+    <div class="card-label">Detail Level</div>
+    <div class="zoom-grid">
+      <div class="zoom-opt" data-zoom="13">
+        <div class="znum">13</div>
+        <div class="zdesc">City overview</div>
+        <div class="ztag fast">fastest</div>
+      </div>
+      <div class="zoom-opt" data-zoom="14">
+        <div class="znum">14</div>
+        <div class="zdesc">Major roads</div>
+        <div class="ztag fast">fast</div>
+      </div>
+      <div class="zoom-opt active" data-zoom="15">
+        <div class="znum">15</div>
+        <div class="zdesc">All streets</div>
+        <div class="ztag">recommended</div>
+      </div>
+      <div class="zoom-opt" data-zoom="16">
+        <div class="znum">16</div>
+        <div class="zdesc">Fine detail</div>
+        <div class="ztag slow">slower</div>
+      </div>
+      <div class="zoom-opt" data-zoom="17">
+        <div class="znum">17</div>
+        <div class="zdesc">House #s 🏠</div>
+        <div class="ztag slow">slowest</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Build -->
+  <div class="card" data-step="03 / BUILD">
+    <div class="card-label">Output</div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="val" id="statTiles">—</div><div class="lbl">Tiles</div></div>
+      <div class="stat-box"><div class="val" id="statPx">—</div><div class="lbl">Pixels</div></div>
+      <div class="stat-box"><div class="val" id="statTime">—</div><div class="lbl">Est. time</div></div>
+    </div>
+    <div class="warn" id="warnBox"></div>
+    <button id="buildBtn" disabled>↓ Select a city first</button>
+    <button id="downloadBtn">⬇ Save PNG — Take to FedEx</button>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="status" id="statusText"></div>
+    </div>
+    <div id="previewWrap">
+      <img id="preview" alt="Map preview">
+      <div class="fedex-tip">
+        ✦ File saved as <strong>mapstitch_[city]_z[zoom].png</strong><br>
+        ✦ Take it to FedEx Office or Staples<br>
+        ✦ Ask for: <strong>"large format print, matte finish"</strong><br>
+        ✦ For a 4×6ft poster: <strong>"72 × 48 inches"</strong>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Map data © <a href="https://openstreetmap.org" target="_blank">OpenStreetMap</a> contributors · 
+    Built with zero dependencies · 
+    <a href="https://github.com" target="_blank">GitHub</a>
+  </footer>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let selectedCity = null;   // { name, bbox: [south, north, west, east] }
+let selectedZoom = 15;
+let globalCanvas = null;
+const TILE_SIZE = 256;
+
+// ── Tile math ───────────────────────────────────────────────────────────────
+function latLonToTile(lat, lon, zoom) {
+  const n = Math.pow(2, zoom);
+  const x = Math.floor((lon + 180) / 360 * n);
+  const latR = lat * Math.PI / 180;
+  const y = Math.floor((1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n);
+  return { x, y };
+}
+
+function getTileInfo() {
+  if (!selectedCity) return null;
+  const [south, north, west, east] = selectedCity.bbox;
+  const tl = latLonToTile(north, west, selectedZoom);
+  const br = latLonToTile(south, east, selectedZoom);
+  const xCount = br.x - tl.x + 1;
+  const yCount = br.y - tl.y + 1;
+  const total = xCount * yCount;
+  return { tl, br, xCount, yCount, total };
+}
+
+// ── UI update ───────────────────────────────────────────────────────────────
+function updateStats() {
+  const info = getTileInfo();
+  if (!info) {
+    ['statTiles','statPx','statTime'].forEach(id => document.getElementById(id).textContent = '—');
+    document.getElementById('buildBtn').disabled = true;
+    document.getElementById('buildBtn').textContent = '↓ Select a city first';
+    document.getElementById('warnBox').style.display = 'none';
+    return;
+  }
+  const { xCount, yCount, total } = info;
+  document.getElementById('statTiles').textContent = total.toLocaleString();
+  document.getElementById('statPx').textContent = `${(xCount*TILE_SIZE/1000).toFixed(1)}k×${(yCount*TILE_SIZE/1000).toFixed(1)}k`;
+  const secs = Math.round(total * 0.15);
+  document.getElementById('statTime').textContent = secs < 60 ? `~${secs}s` : `~${Math.ceil(secs/60)}min`;
+
+  const warn = document.getElementById('warnBox');
+  if (total > 8000) {
+    warn.style.display = 'block';
+    warn.textContent = `⚠ ${total.toLocaleString()} tiles is a lot. Try a lower zoom level, or it may take 15+ minutes. Keep the tab active.`;
+  } else if (total > 2000) {
+    warn.style.display = 'block';
+    warn.textContent = `⚠ ${total.toLocaleString()} tiles — this will take a few minutes. Keep the tab open.`;
+  } else {
+    warn.style.display = 'none';
+  }
+
+  document.getElementById('buildBtn').disabled = false;
+  document.getElementById('buildBtn').textContent = `⬇ Build Map — ${selectedCity.name}`;
+}
+
+// ── City search via Nominatim ────────────────────────────────────────────────
+async function searchCity() {
+  const q = document.getElementById('cityInput').value.trim();
+  if (!q) return;
+
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Searching...';
+  document.getElementById('searchError').style.display = 'none';
+  document.getElementById('searchResults').style.display = 'none';
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const data = await res.json();
+
+    if (!data.length) {
+      document.getElementById('searchError').style.display = 'block';
+      return;
+    }
+
+    const container = document.getElementById('searchResults');
+    container.innerHTML = '';
+    container.style.display = 'block';
+
+    data.forEach(place => {
+      const [south, north, west, east] = place.boundingbox.map(Number);
+      const div = document.createElement('div');
+      div.className = 'result-item';
+      div.innerHTML = `
+        <span class="name">${place.display_name.split(',').slice(0,3).join(',')}</span>
+        <span class="coords">${south.toFixed(3)}, ${west.toFixed(3)} → ${north.toFixed(3)}, ${east.toFixed(3)}</span>
+      `;
+      div.addEventListener('click', () => selectCity(place));
+      container.appendChild(div);
+    });
+  } catch(e) {
+    document.getElementById('searchError').textContent = 'Search failed. Check your connection.';
+    document.getElementById('searchError').style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Look up →';
+  }
+}
+
+function selectCity(place) {
+  const [south, north, west, east] = place.boundingbox.map(Number);
+  const shortName = place.display_name.split(',').slice(0,2).join(',').trim();
+
+  selectedCity = { name: shortName, bbox: [south, north, west, east] };
+
+  document.getElementById('searchResults').style.display = 'none';
+  document.getElementById('cityInput').value = shortName;
+
+  const sel = document.getElementById('citySelected');
+  sel.style.display = 'flex';
+  sel.textContent = `✓ ${shortName} — bbox locked`;
+
+  updateStats();
+}
+
+// ── Tile loading ─────────────────────────────────────────────────────────────
+function loadTile(z, x, y) {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    const s = ['a','b','c'][(x + y) % 3];
+    img.src = `https://${s}.tile.openstreetmap.org/${z}/${x}/${y}.png`;
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      // blank fallback tile
+      const c = document.createElement('canvas');
+      c.width = c.height = TILE_SIZE;
+      c.getContext('2d').fillStyle = '#f2efe9';
+      c.getContext('2d').fillRect(0,0,TILE_SIZE,TILE_SIZE);
+      const b = new window.Image();
+      b.src = c.toDataURL();
+      b.onload = () => resolve(b);
+    };
+  });
+}
+
+// ── Build map ────────────────────────────────────────────────────────────────
+async function buildMap() {
+  const info = getTileInfo();
+  if (!info) return;
+  const { tl, br, xCount, yCount, total } = info;
+
+  const buildBtn = document.getElementById('buildBtn');
+  buildBtn.disabled = true;
+  buildBtn.textContent = '⏳ Building...';
+
+  document.getElementById('downloadBtn').style.display = 'none';
+  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('statusText').textContent = 'Allocating canvas...';
+
+  const canvas = document.createElement('canvas');
+  canvas.width = xCount * TILE_SIZE;
+  canvas.height = yCount * TILE_SIZE;
+  const ctx = canvas.getContext('2d');
+
+  const tiles = [];
+  for (let x = tl.x; x <= br.x; x++)
+    for (let y = tl.y; y <= br.y; y++)
+      tiles.push({ x, y });
+
+  let done = 0;
+  const BATCH = 8;
+
+  for (let i = 0; i < tiles.length; i += BATCH) {
+    const batch = tiles.slice(i, i + BATCH);
+    await Promise.all(batch.map(async ({ x, y }) => {
+      const img = await loadTile(selectedZoom, x, y);
+      ctx.drawImage(img, (x - tl.x) * TILE_SIZE, (y - tl.y) * TILE_SIZE);
+      done++;
+      const pct = Math.round(done / total * 100);
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('statusText').textContent =
+        `Downloading tiles… ${done.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`;
+    }));
+    await new Promise(r => setTimeout(r, 60));
+  }
+
+  globalCanvas = canvas;
+  document.getElementById('statusText').textContent = '✓ Complete — save your PNG below';
+
+  // Preview
+  const pw = document.createElement('canvas');
+  const scale = Math.min(1, 670 / canvas.width);
+  pw.width = Math.round(canvas.width * scale);
+  pw.height = Math.round(canvas.height * scale);
+  pw.getContext('2d').drawImage(canvas, 0, 0, pw.width, pw.height);
+  document.getElementById('preview').src = pw.toDataURL('image/jpeg', 0.88);
+  document.getElementById('previewWrap').style.display = 'block';
+
+  const dlBtn = document.getElementById('downloadBtn');
+  dlBtn.style.display = 'block';
+  dlBtn.onclick = () => {
+    document.getElementById('statusText').textContent = 'Encoding PNG… (may take 30s for large maps)';
+    const safeName = selectedCity.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    setTimeout(() => {
+      globalCanvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mapstitch_${safeName}_z${selectedZoom}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById('statusText').textContent = '✓ Saved! Head to FedEx.';
+      }, 'image/png');
+    }, 100);
+  };
+
+  buildBtn.disabled = false;
+  buildBtn.textContent = '↺ Rebuild';
+}
+
+// ── Event listeners ──────────────────────────────────────────────────────────
+document.getElementById('searchBtn').addEventListener('click', searchCity);
+document.getElementById('cityInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') searchCity();
+});
+
+document.querySelectorAll('.zoom-opt').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.zoom-opt').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    selectedZoom = parseInt(el.dataset.zoom);
+    updateStats();
+  });
+});
+
+document.getElementById('buildBtn').addEventListener('click', buildMap);
+updateStats();
+</script>
+</body>
+</html>
