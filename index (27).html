@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MapStitch — Print Any City</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f7f7f5;
+  --white: #ffffff;
+  --border: #e5e5e2;
+  --border-2: #c8c8c4;
+  --text: #181816;
+  --text-2: #727270;
+  --text-3: #b4b4b0;
+  --ink: #181816;
+  --ink-light: #f4f4f2;
+  --ink-border: #d8d8d4;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+.page { max-width: 960px; margin: 0 auto; padding: 52px 32px 80px; }
+.layout { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+.col-right { position: sticky; top: 48px; }
+
+/* Header */
+.wordmark { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 24px; display: flex; align-items: center; gap: 7px; }
+.wm-icon { width: 18px; height: 18px; background: var(--ink); border-radius: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; }
+.wm-icon span { background: white; border-radius: 1px; opacity: 0.5; }
+.wm-icon span:last-child { opacity: 1; }
+h1 { font-size: 38px; font-weight: 400; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 12px; }
+h1 em { font-family: 'Instrument Serif', serif; font-style: italic; }
+.tagline { font-size: 14px; color: var(--text-2); line-height: 1.7; margin-bottom: 36px; }
+
+/* Steps */
+.step { margin-bottom: 24px; }
+.step.hidden { display: none; }
+.step.animating-in { display: block; animation: stepIn 0.28s cubic-bezier(0.22,1,0.36,1) forwards; }
+@keyframes stepIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.step-hd { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+.step-num { width: 20px; height: 20px; background: var(--ink); color: white; border-radius: 50%; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
+.step-num.done { background: var(--border-2); }
+.step-lbl { font-size: 12px; font-weight: 600; }
+.step-sub { font-size: 11px; color: var(--text-3); margin-left: auto; }
+
+/* Search */
+.search-box { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; transition: border-color 0.15s, box-shadow 0.15s; }
+.search-box:focus-within { border-color: var(--border-2); box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.search-row { display: flex; align-items: center; }
+#cityInput { flex: 1; border: none; outline: none; padding: 13px 15px; font-family: 'Inter', sans-serif; font-size: 14px; color: var(--text); background: transparent; }
+#cityInput::placeholder { color: var(--text-3); }
+#searchBtn { margin: 5px; padding: 8px 14px; background: var(--ink); color: white; border: none; border-radius: var(--radius-sm); font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
+#searchBtn:hover { opacity: 0.7; }
+#searchBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+.results { display: none; border-top: 1px solid var(--border); }
+.r-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.r-item:last-child { border-bottom: none; }
+.r-item:hover { background: var(--bg); }
+.r-name { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+.r-sub { font-size: 11px; color: var(--text-3); }
+.search-err { display: none; padding: 9px 15px; font-size: 12px; color: #dc2626; border-top: 1px solid var(--border); }
+
+/* Selected cities chips */
+.cities-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.city-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  background: var(--ink); border-radius: var(--radius-sm);
+  animation: chipIn 0.2s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes chipIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.chip-dot { width: 6px; height: 6px; background: white; border-radius: 50%; opacity: 0.5; flex-shrink: 0; }
+.chip-name { font-size: 12px; font-weight: 500; color: white; flex: 1; }
+.chip-remove { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.4); font-size: 16px; line-height: 1; padding: 0 2px; transition: color 0.15s; flex-shrink: 0; }
+.chip-remove:hover { color: white; }
+
+.add-another {
+  display: none;
+  margin-top: 6px;
+  font-size: 12px; color: var(--text-3);
+  cursor: pointer; padding: 2px 0;
+  width: fit-content;
+  border-bottom: 1px dashed var(--border-2);
+  transition: color 0.15s;
+}
+.add-another:hover { color: var(--text-2); }
+
+.combine-note {
+  display: none;
+  margin-top: 8px;
+  padding: 9px 12px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: var(--radius-sm);
+  font-size: 11px; color: #0369a1; line-height: 1.5;
+}
+
+/* Detail level */
+.detail-grid { display: grid; grid-template-columns: 1fr; gap: 6px; }
+.d-card { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; cursor: pointer; transition: all 0.14s; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 12px; user-select: none; }
+.d-card:hover { border-color: var(--border-2); }
+.d-card.on { background: var(--ink); border-color: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.d-left { display: flex; flex-direction: column; gap: 2px; }
+.d-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.d-card.on .d-title { color: white; }
+.d-desc { font-size: 11px; color: var(--text-3); }
+.d-card.on .d-desc { color: rgba(255,255,255,0.45); }
+.d-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.d-speed { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 4px; background: var(--bg); color: var(--text-3); }
+.d-speed.fast { background: #f0fdf4; color: #15803d; }
+.d-speed.warn { background: #fff7ed; color: #c2410c; }
+.d-speed.slow { background: #fef2f2; color: #dc2626; }
+.d-card.on .d-speed { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.7); }
+.d-check { width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.d-card.on .d-check { border-color: white; background: white; }
+.d-check svg { display: none; }
+.d-card.on .d-check svg { display: block; }
+
+/* Right panel */
+.panel { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.panel-head { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase; }
+.panel-body { padding: 18px 20px; }
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.stat { background: var(--bg); border-radius: var(--radius-sm); padding: 12px 8px; text-align: center; }
+.s-val { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.s-lbl { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); }
+.warn-box { display: none; padding: 10px 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: var(--radius-sm); font-size: 12px; color: #9a3412; line-height: 1.5; margin-bottom: 14px; }
+#buildBtn { width: 100%; padding: 13px; background: var(--ink); color: white; border: none; border-radius: var(--radius-sm); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+#buildBtn:hover:not(:disabled) { opacity: 0.8; transform: translateY(-1px); }
+#buildBtn:disabled { background: var(--border); color: var(--text-3); cursor: not-allowed; transform: none; }
+#saveBtn { width: 100%; padding: 12px; background: transparent; color: var(--ink); border: 1px solid var(--ink-border); border-radius: var(--radius-sm); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; display: none; margin-top: 8px; transition: background 0.15s; }
+#saveBtn:hover { background: var(--ink-light); }
+.prog-wrap { display: none; margin-top: 14px; }
+.prog-track { height: 2px; background: var(--border); border-radius: 99px; overflow: hidden; margin-bottom: 7px; }
+.prog-fill { height: 2px; background: var(--ink); border-radius: 99px; width: 0%; transition: width 0.2s; }
+.prog-txt { font-size: 11px; color: var(--text-3); text-align: center; font-variant-numeric: tabular-nums; }
+.preview-wrap { display: none; margin-top: 14px; }
+#mapImg { width: 100%; border-radius: 6px; border: 1px solid var(--border); display: block; }
+.print-note { margin-top: 10px; padding: 11px 13px; background: var(--bg); border-radius: var(--radius-sm); font-size: 11px; color: var(--text-2); line-height: 1.7; border: 1px solid var(--border); }
+.print-note strong { color: var(--text); }
+
+footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-3); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+footer a { color: var(--text-3); text-decoration: none; }
+footer a:hover { color: var(--text-2); }
+.ft-links { display: flex; gap: 14px; }
+
+@media (max-width: 680px) {
+  .page { padding: 36px 16px 60px; }
+  .layout { grid-template-columns: 1fr; gap: 24px; }
+  .col-right { position: static; }
+  h1 { font-size: 30px; }
+  #cityInput { font-size: 16px; }
+  footer { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="layout">
+    <div class="col-left">
+      <div class="wordmark"><div class="wm-icon"><span></span><span></span><span></span><span></span></div>MapStitch</div>
+      <h1>Print any place,<br><em>anywhere.</em></h1>
+      <p class="tagline">Search any place — city, neighborhood, suburb, or district — pick your detail level, and download a high-res PNG ready for any print shop. Combine multiple areas into one map.</p>
+
+      <!-- Step 1 -->
+      <div class="step" id="step1">
+        <div class="step-hd">
+          <div class="step-num" id="num1">1</div>
+          <div class="step-lbl">Search places</div>
+          <div class="step-sub">Add one or combine multiple</div>
+        </div>
+        <div class="search-box" id="searchBox">
+          <div class="search-row">
+            <input type="text" id="cityInput" placeholder="Cheshire Flagstaff, Tokyo, Central Park…" autocomplete="off">
+            <button id="searchBtn">Search</button>
+          </div>
+          <div class="results" id="results"></div>
+          <div class="search-err" id="searchErr">No results — try a different query.</div>
+        </div>
+
+        <!-- Selected cities -->
+        <div class="cities-list" id="citiesList"></div>
+        <div class="add-another" id="addAnother" onclick="showSearch()">+ Add another area</div>
+        <div class="combine-note" id="combineNote">
+          The selected areas will be downloaded separately and placed side by side into one PNG — no terrain between them.
+        </div>
+      </div>
+
+      <!-- Step 2 (hidden until city added) -->
+      <div class="step hidden" id="step2">
+        <div class="step-hd">
+          <div class="step-num" id="num2">2</div>
+          <div class="step-lbl">How much detail?</div>
+        </div>
+        <div class="detail-grid">
+          <div class="d-card" data-z="13">
+            <div class="d-left"><div class="d-title">Overview</div><div class="d-desc">Main areas and highways — great for a wide city view</div></div>
+            <div class="d-right"><div class="d-speed fast">Fastest</div><div class="d-check"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="#181816" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="d-card" data-z="15">
+            <div class="d-left"><div class="d-title">All Streets <span style="font-size:10px;opacity:0.5;font-weight:400">— recommended</span></div><div class="d-desc">Every street named — best for poster printing</div></div>
+            <div class="d-right"><div class="d-speed fast">~3 min</div><div class="d-check"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="#181816" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="d-card" data-z="16">
+            <div class="d-left"><div class="d-title">Fine Detail</div><div class="d-desc">More granular roads — great for dense urban areas</div></div>
+            <div class="d-right"><div class="d-speed slow">~10 min</div><div class="d-check"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="#181816" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="d-card" data-z="17">
+            <div class="d-left"><div class="d-title">House Numbers</div><div class="d-desc">Individual address numbers on every building</div></div>
+            <div class="d-right"><div class="d-speed slow">~15 min</div><div class="d-check"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="#181816" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+        </div>
+        <div id="detailWarn" style="display:none;margin-top:8px;padding:9px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:var(--radius-sm);font-size:11px;color:#991b1b;line-height:1.55;">
+          ⚠ This may take a while for large areas. Try searching a smaller neighborhood or district for faster results.
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col-right">
+      <div class="panel">
+        <div class="panel-head">Output</div>
+        <div class="panel-body">
+          <div class="stats-row">
+            <div class="stat"><div class="s-val" id="sTiles">—</div><div class="s-lbl">Tiles</div></div>
+            <div class="stat"><div class="s-val" id="sPx">—</div><div class="s-lbl">Size</div></div>
+            <div class="stat"><div class="s-val" id="sTime">—</div><div class="s-lbl">Time</div></div>
+          </div>
+          <div class="warn-box" id="warnBox"></div>
+          <button id="buildBtn" disabled>Add a city to begin</button>
+          <button id="saveBtn">↓ Save PNG</button>
+          <div class="prog-wrap" id="progWrap">
+            <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+            <div class="prog-txt" id="progTxt"></div>
+          </div>
+          <div class="preview-wrap" id="previewWrap">
+            <img id="mapImg" alt="Map preview">
+            <div class="print-note">
+              <strong>At FedEx or Staples:</strong> large format, matte finish.<br>
+              4×6ft → <strong>72 × 48 in, landscape</strong><br>
+              3×4ft → <strong>48 × 36 in, landscape</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>© 2026 <a href="https://github.com/sami-tanquary" target="_blank">Sami Tanquary</a></span>
+    <div class="ft-links">
+      <a href="https://github.com/sami-tanquary/MapStitch" target="_blank">GitHub</a>
+      <a href="https://openstreetmap.org" target="_blank">© OpenStreetMap</a>
+    </div>
+  </footer>
+</div>
+
+<script>
+let cities = []; // array of { name, bbox: [s,n,w,e] }
+let zoom = 15;
+let canvas = null;
+const T = 256;
+
+function toTile(lat, lon, z) {
+  const n = Math.pow(2, z);
+  return {
+    x: Math.floor((lon+180)/360*n),
+    y: Math.floor((1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*n)
+  };
+}
+
+function getInfoForBbox(bbox) {
+  const [s,n,w,e] = bbox;
+  const tl = toTile(n,w,zoom), br = toTile(s,e,zoom);
+  const xc = br.x-tl.x+1, yc = br.y-tl.y+1;
+  return { tl, br, xc, yc, total: xc*yc };
+}
+
+function getTimeEstimate(z) {
+  if (!cities.length) return null;
+  const infos = cities.map(c => getInfoForBbox_z(c.bbox, z));
+  const total = infos.reduce((sum, i) => sum + i.total, 0);
+  const secs = Math.round(total * 0.06);
+  if (secs < 60) return `~${secs}s`;
+  if (secs < 3600) return `~${Math.ceil(secs/60)}min`;
+  return `~${(secs/3600).toFixed(1)}hr`;
+}
+
+function getInfoForBbox_z(bbox, z) {
+  const [s,n,w,e] = bbox;
+  const tl = toTile(n,w,z), br = toTile(s,e,z);
+  return { total: (br.x-tl.x+1) * (br.y-tl.y+1) };
+}
+
+function updateDetailCards() {
+  document.querySelectorAll('.d-card').forEach(el => {
+    const z = parseInt(el.dataset.z);
+    const est = getTimeEstimate(z);
+    const tag = el.querySelector('.d-speed');
+    if (!tag || !est) return;
+    tag.textContent = est;
+    const secs = cities.length
+      ? Math.round(cities.map(c => getInfoForBbox_z(c.bbox, z)).reduce((s,i) => s+i.total, 0) * 0.06)
+      : 0;
+    tag.className = 'd-speed';
+    if (secs < 300) tag.classList.add('fast');
+    else if (secs < 600) tag.classList.add('warn');
+    else tag.classList.add('slow');
+  });
+
+  // show warning note if selected zoom is red
+  const activeCard = document.querySelector('.d-card.on');
+  const warnNote = document.getElementById('detailWarn');
+  if (activeCard && cities.length) {
+    const z = parseInt(activeCard.dataset.z);
+    const secs = Math.round(cities.map(c => getInfoForBbox_z(c.bbox, z)).reduce((s,i) => s+i.total, 0) * 0.06);
+    if (secs >= 600) {
+      warnNote.style.display = 'block';
+    } else {
+      warnNote.style.display = 'none';
+    }
+  } else {
+    warnNote.style.display = 'none';
+  }
+}
+
+function getInfo() {
+  if (!cities.length) return null;
+  const infos = cities.map(c => getInfoForBbox(c.bbox));
+  const total = infos.reduce((sum, i) => sum + i.total, 0);
+  const totalW = infos.reduce((sum, i) => sum + i.xc, 0);
+  const maxH = Math.max(...infos.map(i => i.yc));
+  return { infos, total, totalW, maxH };
+}
+
+function revealStep(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('hidden');
+  el.classList.add('animating-in');
+  el.addEventListener('animationend', () => el.classList.remove('animating-in'), { once: true });
+}
+
+function renderChips() {
+  const list = document.getElementById('citiesList');
+  list.innerHTML = '';
+  cities.forEach((c, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'city-chip';
+    chip.innerHTML = `
+      <div class="chip-dot"></div>
+      <div class="chip-name">${c.name}</div>
+      <button class="chip-remove" title="Remove">×</button>
+    `;
+    chip.querySelector('.chip-remove').onclick = () => {
+      cities.splice(i, 1);
+      renderChips();
+      updateStats();
+      updateDetailCards();
+    };
+    list.appendChild(chip);
+  });
+
+  // add another link
+  const addBtn = document.getElementById('addAnother');
+  addBtn.style.display = cities.length > 0 ? 'block' : 'none';
+
+  // combine note
+  const note = document.getElementById('combineNote');
+  note.style.display = cities.length > 1 ? 'block' : 'none';
+}
+
+function showSearch() {
+  document.getElementById('searchBox').style.display = 'block';
+  document.getElementById('cityInput').value = '';
+  document.getElementById('cityInput').focus();
+  document.getElementById('addAnother').style.display = 'none';
+}
+
+function updateStats() {
+  const i = getInfo();
+  if (!i) {
+    ['sTiles','sPx','sTime'].forEach(id => document.getElementById(id).textContent = '—');
+    document.getElementById('buildBtn').disabled = true;
+    document.getElementById('buildBtn').textContent = 'Add a city to begin';
+    document.getElementById('warnBox').style.display = 'none';
+    return;
+  }
+  const { infos, total, totalW, maxH } = i;
+  document.getElementById('sTiles').textContent = total.toLocaleString();
+  document.getElementById('sPx').textContent = `${Math.round(totalW*T/1000)}k×${Math.round(maxH*T/1000)}k`;
+  const secs = Math.round(total * 0.06); // ~1000 tiles/min
+  let timeStr;
+  if (secs < 60) timeStr = `${secs}s`;
+  else if (secs < 3600) timeStr = `${Math.ceil(secs/60)}min`;
+  else timeStr = `${(secs/3600).toFixed(1)}hr`;
+  document.getElementById('sTime').textContent = timeStr;
+  const wb = document.getElementById('warnBox');
+  if (total > 3000) { wb.style.display = 'block'; wb.textContent = `${total.toLocaleString()} tiles — keep this tab open. Est. ${Math.ceil(total*0.15/60)} min.`; }
+  else wb.style.display = 'none';
+  const label = cities.length > 1
+    ? `Build combined map (${cities.length} areas)`
+    : `Build map — ${cities[0].name}`;
+  document.getElementById('buildBtn').disabled = false;
+  document.getElementById('buildBtn').textContent = label;
+  document.getElementById('saveBtn').style.display = 'none';
+  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('progWrap').style.display = 'none';
+}
+
+async function search() {
+  const q = document.getElementById('cityInput').value.trim();
+  if (!q) return;
+  const btn = document.getElementById('searchBtn');
+  if (btn.disabled) return; // prevent double-fire from Enter + click
+  btn.disabled = true; btn.textContent = '…';
+  document.getElementById('searchErr').style.display = 'none';
+  document.getElementById('results').style.display = 'none';
+  try {
+    const data = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`,{headers:{'Accept-Language':'en'}}).then(r=>r.json());
+    if (!data.length) { document.getElementById('searchErr').style.display = 'block'; return; }
+    // dedupe by name — Nominatim sometimes returns near-identical results
+    const seen = new Set();
+    const unique = data.filter(p => {
+      const key = p.display_name.split(',').slice(0,3).join(',').trim();
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    const list = document.getElementById('results');
+    list.innerHTML = ''; list.style.display = 'block';
+    unique.forEach(p => {
+      const [s,n,w,e] = p.boundingbox.map(Number);
+      const name = p.display_name.split(',').slice(0,2).join(',').trim();
+      const d = document.createElement('div'); d.className = 'r-item';
+      d.innerHTML = `<div class="r-name">${p.display_name.split(',').slice(0,3).join(',')}</div><div class="r-sub">${s.toFixed(2)}, ${w.toFixed(2)} → ${n.toFixed(2)}, ${e.toFixed(2)}</div>`;
+      d.onclick = () => {
+        // avoid duplicates
+        if (!cities.find(c => c.name === name)) {
+          cities.push({ name, bbox:[s,n,w,e] });
+        }
+        list.style.display = 'none';
+        document.getElementById('searchBox').style.display = 'block';
+        document.getElementById('cityInput').value = '';
+        document.getElementById('num1').classList.add('done');
+        renderChips();
+        updateStats();
+        updateDetailCards();
+        // reveal step 2
+        if (document.getElementById('step2').classList.contains('hidden')) {
+          setTimeout(() => {
+            revealStep('step2');
+            selectDetail(document.querySelector('.d-card[data-z="15"]'));
+          }, 120);
+        }
+      };
+      list.appendChild(d);
+    });
+  } catch {
+    document.getElementById('searchErr').textContent = 'Search failed — check connection.';
+    document.getElementById('searchErr').style.display = 'block';
+  }
+  finally { btn.disabled = false; btn.textContent = 'Search'; }
+}
+
+function selectDetail(el) {
+  document.querySelectorAll('.d-card').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  zoom = parseInt(el.dataset.z);
+  document.getElementById('num2').classList.add('done');
+  updateStats();
+  updateDetailCards();
+}
+
+function loadTile(z,x,y) {
+  return new Promise(resolve => {
+    const img = new Image(); img.crossOrigin = 'anonymous';
+    img.src = `https://${'abc'[(x+y)%3]}.tile.openstreetmap.org/${z}/${x}/${y}.png`;
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      const c = document.createElement('canvas'); c.width = c.height = T;
+      c.getContext('2d').fillStyle = '#f5f5f0'; c.getContext('2d').fillRect(0,0,T,T);
+      const b = new Image(); b.src = c.toDataURL(); b.onload = () => resolve(b);
+    };
+  });
+}
+
+async function build() {
+  const i = getInfo(); if (!i) return;
+  const { infos, total, totalW, maxH } = i;
+  const btn = document.getElementById('buildBtn');
+  btn.disabled = true; btn.textContent = 'Building…';
+  document.getElementById('saveBtn').style.display = 'none';
+  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('progWrap').style.display = 'block';
+  document.getElementById('progFill').style.width = '0%';
+
+  // Final canvas: all areas side by side with gap and padding
+  const PAD = 48;
+  const GAP = 32;
+  const finalW = infos.reduce((sum,inf) => sum + inf.xc*T, 0) + GAP*(infos.length-1) + PAD*2;
+  const finalH = maxH * T + PAD*2;
+  const finalCanvas = document.createElement('canvas');
+  finalCanvas.width = finalW; finalCanvas.height = finalH;
+  const finalCtx = finalCanvas.getContext('2d');
+  finalCtx.fillStyle = '#f7f7f5';
+  finalCtx.fillRect(0, 0, finalW, finalH);
+
+  let done = 0;
+  let xOffset = PAD;
+
+  for (let aIdx = 0; aIdx < infos.length; aIdx++) {
+    const { tl, br, xc, yc } = infos[aIdx];
+
+    // build this area into its own canvas
+    const aCanvas = document.createElement('canvas');
+    aCanvas.width = xc*T; aCanvas.height = yc*T;
+    const aCtx = aCanvas.getContext('2d');
+
+    const tiles = [];
+    for (let x=tl.x;x<=br.x;x++) for (let y=tl.y;y<=br.y;y++) tiles.push({x,y});
+
+    for (let i=0;i<tiles.length;i+=8) {
+      await Promise.all(tiles.slice(i,i+8).map(async ({x,y})=>{
+        const img = await loadTile(zoom,x,y);
+        aCtx.drawImage(img,(x-tl.x)*T,(y-tl.y)*T);
+        done++;
+        const pct = Math.round(done/total*100);
+        document.getElementById('progFill').style.width=pct+'%';
+        document.getElementById('progTxt').textContent=
+          cities.length > 1
+            ? `${cities[aIdx].name} (area ${aIdx+1}/${cities.length}) — ${pct}%`
+            : `${done.toLocaleString()} / ${total.toLocaleString()} tiles (${pct}%)`;
+      }));
+      await new Promise(r=>setTimeout(r,50));
+    }
+
+    // center vertically within padded canvas
+    const yOff = PAD + Math.floor((maxH*T - yc*T) / 2);
+    finalCtx.drawImage(aCanvas, xOffset, yOff);
+
+    // thin border around map
+    finalCtx.strokeStyle = '#c8c8c4';
+    finalCtx.lineWidth = 4;
+    finalCtx.strokeRect(xOffset, yOff, xc*T, yc*T);
+
+    // label below the map in the padding area
+    const label = cities[aIdx].name;
+    const fontSize = Math.max(13, Math.min(16, xc*T/40));
+    finalCtx.font = `600 ${fontSize}px Inter, sans-serif`;
+    finalCtx.fillStyle = '#727270';
+    finalCtx.textAlign = 'center';
+    finalCtx.textBaseline = 'middle';
+    finalCtx.fillText(label, xOffset + (xc*T)/2, yOff + yc*T + PAD/2);
+
+    xOffset += xc*T + GAP;
+  }
+
+  canvas = finalCanvas;
+  document.getElementById('progTxt').textContent = 'Done — save your map below';
+
+  const pw = document.createElement('canvas');
+  const scale = Math.min(1, 400/finalCanvas.width);
+  pw.width=Math.round(finalCanvas.width*scale); pw.height=Math.round(finalCanvas.height*scale);
+  pw.getContext('2d').drawImage(finalCanvas,0,0,pw.width,pw.height);
+  document.getElementById('mapImg').src=pw.toDataURL('image/jpeg',0.88);
+  document.getElementById('previewWrap').style.display='block';
+
+  const sb=document.getElementById('saveBtn'); sb.style.display='block';
+  sb.onclick=()=>{
+    document.getElementById('progTxt').textContent='Encoding PNG…';
+    const safe=cities.map(c=>c.name.replace(/[^a-z0-9]/gi,'_').toLowerCase()).join('_and_');
+    setTimeout(()=>{
+      canvas.toBlob(blob=>{
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url;
+        a.download=`mapstitch_${safe}_z${zoom}.png`;
+        a.click(); URL.revokeObjectURL(url);
+        document.getElementById('progTxt').textContent='Saved!';
+      },'image/png');
+    },100);
+  };
+  btn.disabled=false; btn.textContent=cities.length>1?'Rebuild combined map':'Rebuild';
+}
+
+document.getElementById('searchBtn').addEventListener('click', search);
+document.getElementById('cityInput').addEventListener('keydown', e=>{ if(e.key==='Enter') search(); });
+document.querySelectorAll('.d-card').forEach(el=>el.addEventListener('click',()=>selectDetail(el)));
+document.getElementById('buildBtn').addEventListener('click', build);
+</script>
+</body>
+</html>
