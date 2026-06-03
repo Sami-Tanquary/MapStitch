@@ -1,45 +1,27 @@
 # MapStitch 🗺️
 
-**Stitch OpenStreetMap tiles into print-ready maps for any city in the world.**
+**Print any place in the world — neighborhoods, cities, suburbs, districts.**
 
-No API key. No installs. No backend. Just open index.html and go.
+No account. No API key. No installs. Works entirely in your browser.
 
----
-
-## How it works
-
-1. Search any city
-2. Pick your detail level (streets, house numbers, etc.)
-3. Hit build — MapStitch fetches and stitches real OSM tiles in your browser
-4. Download a high-res PNG and take it to any print shop
+**[Try it →](https://sami-tanquary.github.io/MapStitch)**
 
 ---
 
-## Detail levels
+## Features
 
-| Zoom | What you see | Tiles (avg city) |
-|------|-------------|-----------------|
-| 13 | City overview | ~65 |
-| 14 | Major roads | ~260 |
-| 15 | All street names ✅ | ~1,000 |
-| 16 | Fine detail | ~4,000 |
-| 17 | House numbers 🏠 | ~16,000 |
-
----
-
-## Deploy
-
-Works out of the box on GitHub Pages — just push index.html to any repo with Pages enabled.
-
-yourusername.github.io/mapstitch
+- Search any place using OpenStreetMap data
+- Choose your detail level — from major roads to individual house numbers
+- Combine multiple areas into one side-by-side map
+- Download a high-res PNG ready for any print shop
 
 ---
 
 ## Stack
 
-Pure HTML, CSS, and vanilla JS. Zero dependencies. Zero frameworks.
+Vanilla HTML, CSS, and JS. Zero dependencies. Zero frameworks.
 
-Map data © OpenStreetMap contributors.
+Map data © [OpenStreetMap](https://openstreetmap.org) contributors.
 
 ---
 
